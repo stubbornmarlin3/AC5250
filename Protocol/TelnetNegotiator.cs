@@ -6,6 +6,7 @@ public class TelnetNegotiator
 {
     private readonly ConnectionSettings _settings;
     private readonly Stream _stream;
+    public event Action<string>? DebugLog;
 
     public TelnetNegotiator(ConnectionSettings settings, Stream stream)
     {
@@ -108,6 +109,7 @@ public class TelnetNegotiator
 
     private async Task SendAsync(byte[] data, CancellationToken ct)
     {
+        DebugLog?.Invoke($"SEND [{data.Length}]: {string.Join(" ", data.Select(b => b.ToString("X2")))}");
         await _stream.WriteAsync(data, ct);
         await _stream.FlushAsync(ct);
     }

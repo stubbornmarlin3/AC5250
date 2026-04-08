@@ -106,6 +106,8 @@ public class MainForm : Form
         var sessionMenu = CreateMenuItem("&Session");
         sessionMenu.DropDownItems.Add(CreateMenuItem("&New Session...", Keys.Control | Keys.T, OnConnect));
         sessionMenu.DropDownItems.Add(CreateMenuItem("&Close Session", Keys.Control | Keys.W, OnCloseSession));
+        sessionMenu.DropDownItems.Add(new ToolStripSeparator());
+        sessionMenu.DropDownItems.Add(CreateMenuItem("&Debug Log...", Keys.Control | Keys.D, OnShowDebugLog));
         menu.Items.Add(sessionMenu);
 
         var viewMenu = CreateMenuItem("&View");
@@ -166,6 +168,40 @@ public class MainForm : Form
     }
 
     private void OnCloseSession(object? sender, EventArgs e) => OnDisconnect(sender, e);
+
+    private void OnShowDebugLog(object? sender, EventArgs e)
+    {
+        var session = _sessionManager.ActiveSession;
+        if (session == null) return;
+
+        var log = session.GetDebugLog();
+        var text = log.Count == 0 ? "(no data received yet)" : string.Join(Environment.NewLine, log);
+
+        using var dlg = new Form
+        {
+            Text = "Debug Log",
+            Size = new Size(800, 500),
+            StartPosition = FormStartPosition.CenterParent,
+            BackColor = DarkTheme.Surface,
+            ForeColor = DarkTheme.TextPrimary,
+        };
+        dlg.HandleCreated += (_, _) => ApplyDarkTitleBar(dlg);
+
+        var tb = new TextBox
+        {
+            Multiline = true,
+            ReadOnly = true,
+            ScrollBars = ScrollBars.Both,
+            Dock = DockStyle.Fill,
+            Font = new Font("Consolas", 9f),
+            BackColor = DarkTheme.Background,
+            ForeColor = DarkTheme.TextPrimary,
+            WordWrap = false,
+            Text = text,
+        };
+        dlg.Controls.Add(tb);
+        dlg.ShowDialog(this);
+    }
 
     private void OnSessionAdded(TerminalSession session)
     {

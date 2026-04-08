@@ -8,6 +8,7 @@ public class TerminalSession : IDisposable
 {
     private readonly Tn5250Client _client;
     private readonly DataStreamParser _parser;
+    private readonly List<string> _debugLog = new();
 
     public ConnectionSettings Settings { get; }
     public ScreenBuffer Screen { get; }
@@ -33,6 +34,7 @@ public class TerminalSession : IDisposable
         _client.DataReceived += OnDataReceived;
         _client.Disconnected += OnDisconnected;
         _client.Error += OnError;
+        _client.DebugLog += OnDebugLog;
         _parser.SendResponse += OnSendResponse;
     }
 
@@ -344,6 +346,13 @@ public class TerminalSession : IDisposable
     {
         StatusMessage?.Invoke($"Error: {ex.Message}");
     }
+
+    private void OnDebugLog(string msg)
+    {
+        _debugLog.Add($"[{DateTime.Now:HH:mm:ss.fff}] {msg}");
+    }
+
+    public IReadOnlyList<string> GetDebugLog() => _debugLog;
 
     public void Disconnect()
     {

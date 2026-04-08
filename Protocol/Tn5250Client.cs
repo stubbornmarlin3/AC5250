@@ -17,6 +17,7 @@ public class Tn5250Client : IDisposable
     public event Action<byte[]>? DataReceived;
     public event Action<string>? Disconnected;
     public event Action<Exception>? Error;
+    public event Action<string>? DebugLog;
 
     public Tn5250Client(ConnectionSettings settings)
     {
@@ -48,6 +49,7 @@ public class Tn5250Client : IDisposable
         }
 
         _negotiator = new TelnetNegotiator(_settings, _stream);
+        _negotiator.DebugLog += msg => DebugLog?.Invoke(msg);
         _cts = new CancellationTokenSource();
 
         _ = Task.Run(() => ReadLoopAsync(_cts.Token));
@@ -70,6 +72,8 @@ public class Tn5250Client : IDisposable
                     return;
                 }
 
+                DebugLog?.Invoke($"RECV [{bytesRead}]: {FormatHex(buffer, 0, bytesRead)}");
+
                 int i = 0;
                 while (i < bytesRead)
                 {
@@ -89,6 +93,7 @@ public class Tn5250Client : IDisposable
                                 // End of record - deliver the complete 5250 record
                                 if (recordBuffer.Count > 0)
                                 {
+                                    DebugLog?.Invoke($"5250 record [{recordBuffer.Count}]: {FormatHex(recordBuffer.ToArray(), 0, Math.Min(recordBuffer.Count, 40))}");
                                     DataReceived?.Invoke(recordBuffer.ToArray());
                                     recordBuffer.Clear();
                                 }
@@ -97,6 +102,7 @@ public class Tn5250Client : IDisposable
                             case TelnetConstants.DO:
                                 if (i + 1 < bytesRead)
                                 {
+                                    DebugLog?.Invoke($"  Server DO 0x{buffer[i + 1]:X2}");
                                     await _negotiator!.HandleDoAsync(buffer[i + 1], ct);
                                     i++;
                                 }
@@ -105,6 +111,7 @@ public class Tn5250Client : IDisposable
                             case TelnetConstants.WILL:
                                 if (i + 1 < bytesRead)
                                 {
+                                    DebugLog?.Invoke($"  Server WILL 0x{buffer[i + 1]:X2}");
                                     await _negotiator!.HandleWillAsync(buffer[i + 1], ct);
                                     i++;
                                 }
@@ -112,6 +119,8 @@ public class Tn5250Client : IDisposable
 
                             case TelnetConstants.DONT:
                             case TelnetConstants.WONT:
+                                if (i + 1 < bytesRead)
+                                    DebugLog?.Invoke($"  Server {(b == TelnetConstants.DONT ? "DONT" : "WONT")} 0x{buffer[i + 1]:X2}");
                                 i++; // skip option byte
                                 break;
 
@@ -122,6 +131,7 @@ public class Tn5250Client : IDisposable
                                     // Content between SB and IAC SE
                                     int contentStart = i + 1;
                                     int contentLen = seIdx - 1 - contentStart;
+                                    DebugLog?.Invoke($"  Server SB [{contentLen}]: {FormatHex(buffer, contentStart, contentLen)}");
                                     if (contentLen > 0)
                                     {
                                         await _negotiator!.HandleSubnegotiationAsync(
@@ -129,9 +139,14 @@ public class Tn5250Client : IDisposable
                                     }
                                     i = seIdx;
                                 }
+                                else
+                                {
+                                    DebugLog?.Invoke($"  Server SB with no SE found!");
+                                }
                                 break;
 
                             default:
+                                DebugLog?.Invoke($"  Unknown IAC cmd 0x{b:X2}");
                                 break;
                         }
                     }
@@ -187,6 +202,13 @@ public class Tn5250Client : IDisposable
 
         await _stream.WriteAsync(framed.ToArray(), ct);
         await _stream.FlushAsync(ct);
+    }
+
+    private static string FormatHex(byte[] data, int offset, int length)
+    {
+        if (length <= 0) return "(empty)";
+        int end = Math.Min(offset + length, data.Length);
+        return string.Join(" ", Enumerable.Range(offset, end - offset).Select(i => data[i].ToString("X2")));
     }
 
     public void Disconnect()
