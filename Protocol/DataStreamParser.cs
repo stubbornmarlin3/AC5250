@@ -36,8 +36,20 @@ public class DataStreamParser
         switch (opcode)
         {
             case TelnetConstants.OPCODE_OUTPUT:
+                ParseOutput(record, TelnetConstants.HEADER_LENGTH);
+                break;
+
             case TelnetConstants.OPCODE_PUT_GET:
                 ParseOutput(record, TelnetConstants.HEADER_LENGTH);
+                // PUT_GET = output + invite: unlock keyboard and position cursor
+                _screen.InputInhibited = false;
+                if (_screen.CursorRow == 0 && _screen.CursorCol == 0)
+                {
+                    var firstField = _screen.GetNextInputField(0, 0);
+                    if (firstField != null)
+                        _screen.MoveCursorTo(firstField.Row, firstField.Col);
+                }
+                _screen.NotifyScreenChanged();
                 break;
 
             case TelnetConstants.OPCODE_INVITE:
