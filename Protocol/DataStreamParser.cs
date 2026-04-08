@@ -213,8 +213,17 @@ public class DataStreamParser
                     break;
 
                 default:
-                    // Regular EBCDIC data byte - write to screen
-                    _screen.WriteCharacter(b);
+                    if (b >= 0x20 && b <= 0x3F)
+                    {
+                        // Display attribute byte — occupies a screen position as a blank
+                        // and sets display characteristics for following data
+                        _screen.WriteAttribute(b);
+                    }
+                    else
+                    {
+                        // Regular EBCDIC data byte - write to screen
+                        _screen.WriteCharacter(b);
+                    }
                     offset++;
                     break;
             }
@@ -344,7 +353,7 @@ public class DataStreamParser
 
         // Record header (10 bytes)
         // Will be filled in by caller or we build a complete record
-        data.AddRange(new byte[] { 0x00, 0x00, 0x12, 0xA0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 });
+        data.AddRange(new byte[] { 0x00, 0x00, 0x12, 0xA0, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00 });
 
         // Query reply structured field
         var sf = new List<byte>();
